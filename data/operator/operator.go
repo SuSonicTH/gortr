@@ -1,10 +1,9 @@
 package operator
 
 import (
-	"encoding/csv"
-	"fmt"
-	"os"
 	"slices"
+
+	"github.com/SuSonicTH/gortr/data/util"
 )
 
 type Service int
@@ -38,41 +37,39 @@ type Operator struct {
 }
 
 const (
-	OperatorName int = iota
-	OperatorId
-	OperatorCountry
-	OperatorZip
-	OperatorCity
-	OperatorStreet
-	OperatorService
+	indexName int = iota
+	indexId
+	indexCountry
+	indexZip
+	indexCity
+	indexStreet
+	indexService
 )
 
-var Operators map[string]*Operator = nil
-
-func ReadOperators() error {
+func Read() (map[string]*Operator, error) {
 	operators := make(map[string]*Operator, 128)
 
-	records, err := readFile("operator.csv")
+	records, err := util.ReadFile("operator.csv")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, rec := range records {
-		id := rec[OperatorId]
+		id := rec[indexId]
 		operator, exists := operators[id]
 		if !exists {
 			operator = &Operator{
 				id:        id,
-				name:      rec[OperatorName],
-				country:   rec[OperatorCountry],
-				zip:       rec[OperatorZip],
-				city:      rec[OperatorCity],
-				street:    rec[OperatorStreet],
+				name:      rec[indexName],
+				country:   rec[indexCountry],
+				zip:       rec[indexZip],
+				city:      rec[indexCity],
+				street:    rec[indexStreet],
 				servicees: make([]Service, 0),
 			}
 			operators[id] = operator
 		}
-		service := stringToService[rec[OperatorService]]
+		service := stringToService[rec[indexService]]
 		operator.servicees = append(operator.servicees, service)
 	}
 
@@ -80,20 +77,5 @@ func ReadOperators() error {
 		slices.Sort(op.servicees)
 	}
 
-	return nil
-}
-
-func readFile(fileName string) ([][]string, error) {
-	file, err := os.Open(fileName)
-	if err != nil {
-		return nil, fmt.Errorf("could not open file %s: %w", fileName, err)
-	}
-	defer file.Close()
-
-	lines, err := csv.NewReader(file).ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("could not read file %s: %w", fileName, err)
-	}
-
-	return lines[1:], nil
+	return operators, nil
 }

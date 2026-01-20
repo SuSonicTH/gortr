@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/SuSonicTH/gortr/data/operator"
+	"github.com/SuSonicTH/gortr/data"
 	"github.com/SuSonicTH/gortr/get"
 	"github.com/alecthomas/kong"
 )
@@ -23,7 +23,7 @@ func main() {
 	case "get":
 		err = get.Numbers()
 	case "search <number>":
-		operator.ReadOperators()
+		data.Read()
 	default:
 		panic(ctx.Command())
 	}
