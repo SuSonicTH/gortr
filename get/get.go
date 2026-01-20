@@ -18,6 +18,7 @@ var sources = []Source{
 	{"nongeo.csv", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true"},
 	{"short.csv", "https://data.rtr.at/api/v2/tables/tn-kurz?mediaType=csv&unpaged=true"},
 	{"param.csv", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true"},
+	{"operator.csv", "https://data.rtr.at/api/v2/tables/tk-agg?mediaType=csv&unpaged=true"},
 }
 
 func Numbers() error {
