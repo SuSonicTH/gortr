@@ -17,7 +17,7 @@ const (
 func Read() (map[string]Region, error) {
 	regions := make(map[string]Region, 128)
 
-	records, err := util.ReadFile("geo.csv")
+	records, err := util.ReadFile("region.csv")
 	if err != nil {
 		return nil, err
 	}
