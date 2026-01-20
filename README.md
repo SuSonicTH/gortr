@@ -1,5 +1,4 @@
 # GoRTR
-a simple tool to download numbering data rom the austrian RTR with search functionality
+a simple tool to download numbering data from the austrian [RTR](https://www.rtr.at/) with search functionality
 
-This is mainly a lerning excercise to get into go
-
+This is mainly a lerning excercise to get into [go](https://go.dev/)
