@@ -35,7 +35,9 @@ func main() {
 
 	if *pSearch != "" {
 		showHelp = false
-		numbers.Load()
+		if err := numbers.Load(); err != nil {
+			panic(err)
+		}
 		number, err := numbers.Search(*pSearch)
 		if err != nil {
 			fmt.Println(err)

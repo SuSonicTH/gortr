@@ -13,21 +13,22 @@ type NumberType struct {
 }
 
 var numberTypes = []NumberType{
-	{"Range", ""},
-	{"Geo", ""},
-	{"", "private Netze"},
-	{"", "mobile Rufnummern"},
-	{"", "Dial-Up Internetzugänge"},
-	{"", "standortunabhängige Rufnummern"},
-	{"", "konvergente Dienste"},
-	{"", "tariffreie Dienste"},
-	{"", "Dienste mit geregelten Tarifobergrenzen"},
-	{"", "eventtarifierte Dienste"},
-	{"", "SMS Dienste mit geregelten Tarifobergrenzen"},
-	{"", "Routingnummern"},
-	{"", "frei kalkulierbare Mehrwertdienste"},
-	{"", "eventtarifierte Mehrwertdienste"},
-	{"", "Dialer-Programme"},
+	{"range", "ortsnetze"},
+	{"geo", "geographisch"},
+	{"network selection prefix", "Betreiberauswahl-Präfix"},
+	{"corporate", "private Netze"},
+	{"mobile", "mobile Rufnummern"},
+	{"dial-up", "Dial-Up Internetzugänge"},
+	{"location independent", "standortunabhängige Rufnummern"},
+	{"converged service", "konvergente Dienste"},
+	{"freephone", "tariffreie Dienste"},
+	{"services with Ceeling", "Dienste mit geregelten Tarifobergrenzen"},
+	{"event based service", "eventtarifierte Dienste"},
+	{"SMS service", "SMS Dienste mit geregelten Tarifobergrenzen"},
+	{"routing number", "Routingnummern"},
+	{"value added service", "frei kalkulierbare Mehrwertdienste"},
+	{"event based value added service", "eventtarifierte Mehrwertdienste"},
+	{"dialer-program", "Dialer-Programme"},
 }
 
 var fileToNumberType map[string]*NumberType = make(map[string]*NumberType)
@@ -48,20 +49,15 @@ var numbers map[string]*Number = make(map[string]*Number, 0)
 var minLen int = 100
 var maxLen int = 0
 
-func initMaps() {
-	for _, numberType := range numberTypes {
-		if numberType.value != "" {
-			fileToNumberType[numberType.value] = &numberType
-		}
-		if numberType.Name != "" {
-			nameToNumberType[numberType.Name] = &numberType
-		}
-	}
-}
-
-func Load() {
+func Load() error {
 	initMaps()
-	loadGeo()
+	//if err := loadGeo(); err != nil {
+	//	return err
+	//}
+	if err := loadNonGeo(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func Search(search string) (*Number, error) {
@@ -73,6 +69,13 @@ func Search(search string) (*Number, error) {
 		}
 	}
 	return nil, fmt.Errorf("No matching number found for %s", search)
+}
+
+func initMaps() {
+	for _, numberType := range numberTypes {
+		fileToNumberType[numberType.value] = &numberType
+		nameToNumberType[numberType.Name] = &numberType
+	}
 }
 
 const (
@@ -96,6 +99,30 @@ func loadGeo() error {
 	return nil
 }
 
+const (
+	nonGeoType int = iota
+	nonGeoPrefix
+	nonGeoFrom
+	nonGeoTo
+	nonGeoOperatorName
+	nonGeoOperatorId
+)
+
+func loadNonGeo() error {
+	records, err := util.ReadFile("nongeo.csv")
+	if err != nil {
+		return err
+	}
+	for _, rec := range records {
+		numberType, found := fileToNumberType[rec[nonGeoType]]
+		if !found {
+			return fmt.Errorf("Could not find number type %q", rec[nonGeoType])
+		}
+		addNumber(numberType, rec[nonGeoPrefix], rec[nonGeoFrom], rec[nonGeoTo], rec[nonGeoOperatorId])
+	}
+	return nil
+}
+
 func addNumber(numberType *NumberType, prefix, from, to, operator_id string) error {
 	pfxFrom, pfxTo := getPrefix(from, to)
 
@@ -108,6 +135,8 @@ func addNumber(numberType *NumberType, prefix, from, to, operator_id string) err
 	if len(numberFrom) < minLen {
 		minLen = len(numberFrom)
 	}
+
+	//fmt.Println(prefix + from)
 
 	singles, err := getSingles(numberFrom, numberTo)
 	if err != nil {

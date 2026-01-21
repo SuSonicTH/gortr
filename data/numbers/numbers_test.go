@@ -1,4 +1,4 @@
-package geo
+package numbers
 
 import (
 	"testing"
@@ -22,9 +22,9 @@ func Test_getPrefix_nocommon9(t *testing.T) {
 	assertStringEqual(t, "123457", to)
 }
 
-func Test_getNumbers_to_greater_from(t *testing.T) {
+func Test_getSingles_to_greater_from(t *testing.T) {
 	expected := []string{"123", "124", "125"}
-	actual, _ := getNumbers("123", "125")
+	actual, _ := getSingles("123", "125")
 	for i, exp := range expected {
 		if exp != actual[i] {
 			t.Errorf("error in list at %d expected '%s', got '%s'", i, exp, actual[i])
@@ -32,9 +32,9 @@ func Test_getNumbers_to_greater_from(t *testing.T) {
 	}
 }
 
-func Test_getNumbers_to_equal_from(t *testing.T) {
+func Test_getSingles_to_equal_from(t *testing.T) {
 	expected := []string{"123"}
-	actual, _ := getNumbers("123", "123")
+	actual, _ := getSingles("123", "123")
 
 	for i, exp := range expected {
 		if exp != actual[i] {
