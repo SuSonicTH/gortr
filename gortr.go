@@ -1,34 +1,39 @@
 package main
 
 import (
-	"github.com/SuSonicTH/gortr/data"
+	"flag"
+	"fmt"
+	"os"
+
+	"github.com/SuSonicTH/gortr/data/region"
 	"github.com/SuSonicTH/gortr/get"
-	"github.com/alecthomas/kong"
 )
 
-var CLI struct {
-	Get struct {
-	} `cmd:"" help:"get data from rtr"`
-
-	Search struct {
-		Number []string `arg:"" name:"number" help:"number to search"`
-	} `cmd:"" help:"search number"`
-}
-
 func main() {
-	ctx := kong.Parse(&CLI)
+	showHelp := true
+	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
+	pRegion := flag.String("region", "", "match given number to a region")
 
-	var err error
-	switch ctx.Command() {
-	case "get":
-		err = get.Numbers()
-	case "search <number>":
-		data.Read()
-	default:
-		panic(ctx.Command())
+	flag.Parse()
+
+	if *pRefresh {
+		showHelp = false
+		get.Numbers()
+	}
+	if *pRegion != "" {
+		showHelp = false
+		reg, err := region.Search(*pRegion)
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			fmt.Printf("prefix: 0%s\n", reg.Prefix)
+			fmt.Printf("name:   %s\n", reg.Name)
+		}
 	}
 
-	if err != nil {
-		panic(err)
+	if showHelp {
+		fmt.Printf("no argument given\n")
+		fmt.Printf("Usage of %s:\n", os.Args[0])
+		flag.CommandLine.PrintDefaults()
 	}
 }
