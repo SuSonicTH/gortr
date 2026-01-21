@@ -51,9 +51,9 @@ var maxLen int = 0
 
 func Load() error {
 	initMaps()
-	//if err := loadGeo(); err != nil {
-	//	return err
-	//}
+	if err := loadGeo(); err != nil {
+		return err
+	}
 	if err := loadNonGeo(); err != nil {
 		return err
 	}
@@ -135,8 +135,6 @@ func addNumber(numberType *NumberType, prefix, from, to, operator_id string) err
 	if len(numberFrom) < minLen {
 		minLen = len(numberFrom)
 	}
-
-	//fmt.Println(prefix + from)
 
 	singles, err := getSingles(numberFrom, numberTo)
 	if err != nil {
