@@ -24,28 +24,12 @@ func main() {
 	}
 	if *pRegion != "" {
 		showHelp = false
-		reg, err := region.Search(*pRegion)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Printf("prefix: 0%s\n", reg.Prefix)
-			fmt.Printf("name:   %s\n", reg.Name)
-		}
+		searchReagon(*pRegion)
 	}
 
 	if *pSearch != "" {
 		showHelp = false
-		if err := numbers.Load(); err != nil {
-			panic(err)
-		}
-		number, err := numbers.Search(*pSearch)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Printf("%+v\n", *number)
-			//fmt.Printf("prefix: 0%s\n", reg.Prefix)
-			//fmt.Printf("name:   %s\n", reg.Name)
-		}
+		searchNumber(*pSearch)
 	}
 
 	if showHelp {
@@ -53,4 +37,36 @@ func main() {
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		flag.CommandLine.PrintDefaults()
 	}
+}
+
+func searchReagon(search string) {
+	reg, err := region.Search(search)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("prefix: 0%s\n", reg.Prefix)
+	fmt.Printf("name:   %s\n", reg.Name)
+}
+
+func searchNumber(search string) {
+	if err := numbers.Load(); err != nil {
+		panic(err)
+	}
+
+	number, err := numbers.Search(search)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if number.PfxFrom == number.PfxTo {
+		fmt.Printf("number: 0%s%s\n", number.Prefix, number.PfxFrom)
+	} else {
+		fmt.Printf("number: 0%s%s - 0%s%s\n", number.Prefix, number.PfxFrom, number.Prefix, number.PfxTo)
+
+	}
+	fmt.Printf("type: %s\n", number.NumberType.Name)
+	fmt.Printf("operator: %s - %s\n", number.Operator.Id, number.Operator.Name)
 }

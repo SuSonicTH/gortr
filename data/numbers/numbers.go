@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/SuSonicTH/gortr/data/operator"
 	"github.com/SuSonicTH/gortr/data/util"
 )
 
@@ -35,22 +36,29 @@ var fileToNumberType map[string]*NumberType = make(map[string]*NumberType)
 var nameToNumberType map[string]*NumberType = make(map[string]*NumberType)
 
 type Number struct {
-	NumberType  *NumberType
-	Prefix      string
-	Start       string
-	End         string
-	Operator_id string
-	PfxFrom     string
-	PfxTo       string
-	Singles     []string
+	NumberType *NumberType
+	Prefix     string
+	Start      string
+	End        string
+	Operator   *operator.Operator
+	PfxFrom    string
+	PfxTo      string
+	Singles    []string
 }
 
 var numbers map[string]*Number = make(map[string]*Number, 0)
 var minLen int = 100
 var maxLen int = 0
+var operators map[string]*operator.Operator
 
 func Load() error {
 	initMaps()
+	nops, err := operator.Read()
+	if err != nil {
+		return err
+	}
+	operators = nops
+
 	if err := loadGeo(); err != nil {
 		return err
 	}
@@ -92,9 +100,9 @@ func loadGeo() error {
 	if err != nil {
 		return err
 	}
-	geo := nameToNumberType["Geo"]
+	geo := nameToNumberType["geo"]
 	for _, rec := range records {
-		addNumber(geo, rec[geoRegion], rec[geoFrom], rec[geoTo], rec[geoOperatorId])
+		addNumber(geo, rec[geoRegion], rec[geoFrom], rec[geoTo], operators[rec[geoOperatorId]])
 	}
 	return nil
 }
@@ -118,12 +126,27 @@ func loadNonGeo() error {
 		if !found {
 			return fmt.Errorf("Could not find number type %q", rec[nonGeoType])
 		}
-		addNumber(numberType, rec[nonGeoPrefix], rec[nonGeoFrom], rec[nonGeoTo], rec[nonGeoOperatorId])
+
+		var nop *operator.Operator
+		if nopid := rec[nonGeoOperatorId]; nopid == "" {
+			nopName := rec[nonGeoOperatorName]
+			nop = operators[nopName]
+			if nop == nil {
+				nop = &operator.Operator{
+					Id:   "9999",
+					Name: nopName,
+				}
+				operators[nopName] = nop
+			}
+		} else {
+			nop = operators[nopid]
+		}
+		addNumber(numberType, rec[nonGeoPrefix], rec[nonGeoFrom], rec[nonGeoTo], nop)
 	}
 	return nil
 }
 
-func addNumber(numberType *NumberType, prefix, from, to, operator_id string) error {
+func addNumber(numberType *NumberType, prefix, from, to string, nop *operator.Operator) error {
 	pfxFrom, pfxTo := getPrefix(from, to)
 
 	numberFrom := prefix + pfxFrom
@@ -142,15 +165,16 @@ func addNumber(numberType *NumberType, prefix, from, to, operator_id string) err
 	}
 
 	num := Number{
-		NumberType:  numberType,
-		Prefix:      prefix,
-		Start:       from,
-		End:         to,
-		Operator_id: operator_id,
-		PfxFrom:     pfxFrom,
-		PfxTo:       pfxTo,
-		Singles:     singles,
+		NumberType: numberType,
+		Prefix:     prefix,
+		Start:      from,
+		End:        to,
+		Operator:   nop,
+		PfxFrom:    pfxFrom,
+		PfxTo:      pfxTo,
+		Singles:    singles,
 	}
+
 	for _, number := range singles {
 		numbers[number] = &num
 	}

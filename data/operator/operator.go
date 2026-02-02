@@ -27,13 +27,13 @@ var stringToService = map[string]Service{
 }
 
 type Operator struct {
-	id        string
-	name      string
-	country   string
-	zip       string
-	city      string
-	street    string
-	servicees []Service
+	Id        string
+	Name      string
+	Country   string
+	Zip       string
+	City      string
+	Street    string
+	Servicees []Service
 }
 
 const (
@@ -59,22 +59,22 @@ func Read() (map[string]*Operator, error) {
 		operator, exists := operators[id]
 		if !exists {
 			operator = &Operator{
-				id:        id,
-				name:      rec[indexName],
-				country:   rec[indexCountry],
-				zip:       rec[indexZip],
-				city:      rec[indexCity],
-				street:    rec[indexStreet],
-				servicees: make([]Service, 0),
+				Id:        id,
+				Name:      rec[indexName],
+				Country:   rec[indexCountry],
+				Zip:       rec[indexZip],
+				City:      rec[indexCity],
+				Street:    rec[indexStreet],
+				Servicees: make([]Service, 0),
 			}
 			operators[id] = operator
 		}
 		service := stringToService[rec[indexService]]
-		operator.servicees = append(operator.servicees, service)
+		operator.Servicees = append(operator.Servicees, service)
 	}
 
 	for _, op := range operators {
-		slices.Sort(op.servicees)
+		slices.Sort(op.Servicees)
 	}
 
 	return operators, nil
