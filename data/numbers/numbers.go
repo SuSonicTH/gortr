@@ -158,7 +158,7 @@ func addNumber(numberType *NumberType, prefix, from, to, operator_id string) err
 }
 
 func getPrefix(from, to string) (pfxFrom, pfxTo string) {
-	for i := len(from) - 1; i >= 1; i-- {
+	for i := len(from) - 1; i >= 0; i-- {
 		if from[i] != '0' || to[i] != '9' {
 			pfxFrom = from[:i+1]
 			pfxTo = to[:i+1]
