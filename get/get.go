@@ -23,6 +23,7 @@ var sources = []Source{
 }
 
 var db_setup = []string{
+	//id INTEGER PRIMARY KEY, name, country, zip, city,street,
 	"CREATE TABLE operator(betreiber,betreiberid,land,plz,ort,strasse,dienst,anzeigedatum,dienstaufnahme)",
 	"CREATE TABLE geo(ortsnetzkennzahl,ortsnetzname,rufnummernbeginn,rufnummernende,betreiber,betreiberid)",
 	"CREATE TABLE nongeo(rufnummernbereich,bereichskennzahl,rufnummernbeginn,rufnummernende,betreiber,betreiberid)",
