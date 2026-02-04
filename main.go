@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"fmt"
 	"os"
@@ -8,7 +9,10 @@ import (
 	"github.com/SuSonicTH/gortr/data/numbers"
 	"github.com/SuSonicTH/gortr/data/region"
 	"github.com/SuSonicTH/gortr/get"
+	_ "github.com/mattn/go-sqlite3"
 )
+
+const DB_FILE = "./gortr.sqlite3"
 
 func main() {
 	showHelp := true
@@ -20,8 +24,9 @@ func main() {
 
 	if *pRefresh {
 		showHelp = false
-		get.Numbers()
+		refresh()
 	}
+
 	if *pRegion != "" {
 		showHelp = false
 		searchReagon(*pRegion)
@@ -29,6 +34,10 @@ func main() {
 
 	if *pSearch != "" {
 		showHelp = false
+		db := openDb()
+		defer db.Close()
+
+		//searchNumber(db,*pSearch)
 		searchNumber(*pSearch)
 	}
 
@@ -36,6 +45,31 @@ func main() {
 		fmt.Printf("no argument given\n")
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		flag.CommandLine.PrintDefaults()
+	}
+}
+
+func openDb() *sql.DB {
+	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+		refresh()
+	}
+	db, err := sql.Open("sqlite3", DB_FILE)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
+func refresh() {
+	os.Remove(DB_FILE)
+
+	db, err := sql.Open("sqlite3", DB_FILE)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	if err := get.Numbers(db); err != nil {
+		panic(err)
 	}
 }
 

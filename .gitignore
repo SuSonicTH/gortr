@@ -1,5 +1,3 @@
-*.csv
-
 gortr
-gortr
-gortr.exe
+gortr*.exe
+gortr.sqlite3
