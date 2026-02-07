@@ -30,8 +30,7 @@ func main() {
 		db := openDb()
 		defer db.Close()
 
-		//searchNumber(db,*pSearch)
-		searchNumber(*pSearch)
+		searchNumber(db, *pSearch)
 	}
 
 	if showHelp {
@@ -45,10 +44,12 @@ func openDb() *sql.DB {
 	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
 		refresh()
 	}
+
 	db, err := sql.Open("sqlite3", DB_FILE)
 	if err != nil {
 		panic(err)
 	}
+
 	return db
 }
 
@@ -61,18 +62,12 @@ func refresh() {
 	}
 	defer db.Close()
 
-	if err := get.Numbers(db); err != nil {
+	if err := get.FromRtr(db); err != nil {
 		panic(err)
 	}
 }
 
-func searchNumber(search string) {
-	db, err := sql.Open("sqlite3", DB_FILE)
-	if err != nil {
-		panic(err)
-	}
-	defer db.Close()
-
+func searchNumber(db *sql.DB, search string) {
 	number := Normalize(search)
 
 	for i := len(number); i > 0; i-- {
@@ -97,6 +92,7 @@ func getSingle(db *sql.DB, number string) *int {
 		panic(err)
 	}
 	defer rows.Close()
+
 	if rows.Next() {
 		var rangeId int
 		err = rows.Scan(&rangeId)

@@ -60,7 +60,7 @@ var db_setup = []string{
 	"CREATE TABLE operators(id INTEGER PRIMARY KEY, name, country, zip, city,street)",
 	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, file_name)",
 	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER, range_from, range_to)",
-	"CREATE TABLE singles(number PRIMARY KEY, type INTEGER, fk_range INTEGER)",
+	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
 	//"CREATE TABLE region(ortsnetzkennzahl,ortsnetzname)",
 	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
 	//"CREATE TABLE param(parameter,wertvon,wertbis,betreiber,strasse,land,plz,ort,betreiberid)",
@@ -72,7 +72,7 @@ var ignoredRanges map[string]bool = make(map[string]bool)
 
 var lastRangesId = 1
 
-func Numbers(db *sql.DB) error {
+func FromRtr(db *sql.DB) error {
 	databaseInit(db)
 	initIgnoredRanges()
 
@@ -210,7 +210,7 @@ func addRange(numberType, prefix, from, to, nop string, ranges *[][]string, sing
 	}
 
 	*ranges = append(*ranges, []string{id, numberType, prefix, from, to, nop, pfxFrom, pfxTo})
-	if err := addSingles(prefix+pfxFrom, prefix+pfxTo, numberType, id, singles); err != nil {
+	if err := addSingles(prefix+pfxFrom, prefix+pfxTo, id, singles); err != nil {
 		if err == ErrDuplicateSingle {
 			fmt.Fprintf(os.Stderr, "duplicated singles found for prefix %s from %s to %s\n", prefix, from, to)
 		} else {
@@ -231,10 +231,10 @@ func getPrefix(from, to string) (pfxFrom, pfxTo string) {
 	return
 }
 
-var uniqueSingles map[int]bool = make(map[int]bool, 1000000)
+var uniqueSingles map[int]bool = make(map[int]bool, 16_000_000)
 var ErrDuplicateSingle = errors.New("duplicated single number")
 
-func addSingles(pfxFrom, pfxTo, numberType string, rangeId string, singles *[][]string) error {
+func addSingles(pfxFrom, pfxTo, rangeId string, singles *[][]string) error {
 	from, err := strconv.Atoi(pfxFrom)
 	if err != nil {
 		return fmt.Errorf("could not convert '%s' to integer: %w", pfxFrom, err)
@@ -250,7 +250,7 @@ func addSingles(pfxFrom, pfxTo, numberType string, rangeId string, singles *[][]
 		} else {
 			uniqueSingles[i] = true
 		}
-		*singles = append(*singles, []string{strconv.Itoa(i), numberType, rangeId})
+		*singles = append(*singles, []string{strconv.Itoa(i), rangeId})
 	}
 	return nil
 }
