@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/SuSonicTH/gortr/dbload"
 )
@@ -44,18 +45,19 @@ var numberTypes = []NumberType{
 	{"dialer-program", "Dialer-Programme"},
 }
 var numberTypeNameToId map[string]string = make(map[string]string, len(numberTypes))
+var numberTypeFileToId map[string]string = make(map[string]string, len(numberTypes))
 
 var sources = []Source{
 	{"operator", "https://data.rtr.at/api/v2/tables/tk-agg?mediaType=csv&unpaged=true", loadOperators},
 	{"geo", "https://data.rtr.at/api/v2/tables/tn-geo?de&mediaType=csv&unpaged=true", loadGeo},
-	//{"nongeo", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true", loadNonGeo},
+	{"nongeo", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true", loadNonGeo},
 	// {"region", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true"},
 	// {"short", "https://data.rtr.at/api/v2/tables/tn-kurz?mediaType=csv&unpaged=true"},
 	// {"param", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true"},
 }
 
 var db_setup = []string{
-	"CREATE TABLE operator(id INTEGER PRIMARY KEY, name, country, zip, city,street)",
+	"CREATE TABLE operators(id INTEGER PRIMARY KEY, name, country, zip, city,street)",
 	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, file_name)",
 	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER, range_from, range_to)",
 	"CREATE TABLE singles(number PRIMARY KEY, type INTEGER, fk_range INTEGER)",
@@ -66,8 +68,13 @@ var db_setup = []string{
 
 var operators map[string]string = make(map[string]string)
 
+var ignoredRanges map[string]bool = make(map[string]bool)
+
+var lastRangesId = 1
+
 func Numbers(db *sql.DB) error {
 	databaseInit(db)
+	initIgnoredRanges()
 
 	for _, source := range sources {
 		rows, err := downloadFile(source.url, source.name)
@@ -92,9 +99,18 @@ func databaseInit(db *sql.DB) error {
 	for i, nrType := range numberTypes {
 		id := strconv.Itoa(i + 1)
 		numberTypeNameToId[nrType.name] = id
+		numberTypeFileToId[nrType.value] = id
 		ntInsert = append(ntInsert, []string{id, nrType.name, nrType.value})
 	}
 	return dbload.BulkInsert(db, "number_type", ntInsert)
+}
+
+func initIgnoredRanges() {
+	if data, err := os.ReadFile("ignoredRanges"); err == nil {
+		for _, number := range strings.Split(string(data), "\n") {
+			ignoredRanges[number] = true
+		}
+	}
 }
 
 func downloadFile(url string, name string) ([][]string, error) {
@@ -127,22 +143,52 @@ func loadOperators(db *sql.DB, rows [][]string) error {
 			operators[name] = id
 		}
 	}
-	return dbload.BulkInsert(db, "operator", insert)
+	return dbload.BulkInsert(db, "operators", insert)
 }
 
 func loadGeo(db *sql.DB, rows [][]string) error {
-	fmt.Printf("Inserting geo... ")
+	fmt.Printf("Reading geo... ")
 	geo := numberTypeNameToId["geo"]
 
-	ranges := make([][]string, 0, 70000)
-	singles := make([][]string, 0, 10_000_000)
+	ranges := make([][]string, 0, 70_000)
+	singles := make([][]string, 0, 800_000)
 
 	for _, row := range rows {
 		if err := addRange(geo, row[0], row[2], row[3], row[5], &ranges, &singles); err != nil {
 			return err
 		}
 	}
+	fmt.Printf("OK read %d ranges and %d singles\n", len(ranges), len(singles))
 
+	fmt.Printf("Inserting geo... ")
+	if err := dbload.BulkInsert(db, "ranges", ranges); err != nil {
+		return err
+	}
+
+	if err := dbload.BulkInsert(db, "singles", singles); err != nil {
+		return err
+	}
+
+	lastRangesId = len(ranges) + 1
+	fmt.Println("OK")
+	return nil
+}
+
+func loadNonGeo(db *sql.DB, rows [][]string) error {
+	fmt.Printf("Reading nongeo... ")
+
+	ranges := make([][]string, 0, 20_000)
+	singles := make([][]string, 0, 15_000_000)
+
+	for _, row := range rows {
+		nrType := numberTypeFileToId[row[0]]
+		if err := addRange(nrType, row[1], row[2], row[3], row[5], &ranges, &singles); err != nil {
+			return err
+		}
+	}
+	fmt.Printf("OK read %d ranges and %d singles\n", len(ranges), len(singles))
+
+	fmt.Printf("Inserting nongeo... ")
 	if err := dbload.BulkInsert(db, "ranges", ranges); err != nil {
 		return err
 	}
@@ -157,9 +203,9 @@ func loadGeo(db *sql.DB, rows [][]string) error {
 
 func addRange(numberType, prefix, from, to, nop string, ranges *[][]string, singles *[][]string) error {
 	pfxFrom, pfxTo := getPrefix(from, to)
-	id := strconv.Itoa(len(*ranges) + 1)
+	id := strconv.Itoa(len(*ranges) + lastRangesId)
 
-	if prefix == "7242" && from == "931000" {
+	if _, found := ignoredRanges[prefix+from]; found {
 		return nil
 	}
 
@@ -206,9 +252,5 @@ func addSingles(pfxFrom, pfxTo, numberType string, rangeId string, singles *[][]
 		}
 		*singles = append(*singles, []string{strconv.Itoa(i), numberType, rangeId})
 	}
-	return nil
-}
-
-func loadNonGeo(db *sql.DB, rows [][]string) error {
 	return nil
 }

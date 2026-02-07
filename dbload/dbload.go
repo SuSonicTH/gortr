@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const batchSize int = 1000
+const maxParameters = 32766
 
 func BulkInsert(db *sql.DB, table string, rows [][]string) error {
 	columns := len(rows[0])
@@ -17,6 +17,7 @@ func BulkInsert(db *sql.DB, table string, rows [][]string) error {
 	valueString := fmt.Sprintf("(%s),", strings.Join(v, ","))
 
 	from := 0
+	batchSize := maxParameters / columns
 	for to := batchSize; to < len(rows); to += batchSize {
 		if err := insertBatch(db, table, rows[from:to], valueString); err != nil {
 			return err

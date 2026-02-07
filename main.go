@@ -5,9 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/SuSonicTH/gortr/data/numbers"
-	"github.com/SuSonicTH/gortr/data/region"
 	"github.com/SuSonicTH/gortr/get"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -17,7 +16,6 @@ const DB_FILE = "./gortr.sqlite3"
 func main() {
 	showHelp := true
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
-	pRegion := flag.String("region", "", "match given number to a region")
 	pSearch := flag.String("search", "", "serach for a matching number")
 
 	flag.Parse()
@@ -25,11 +23,6 @@ func main() {
 	if *pRefresh {
 		showHelp = false
 		refresh()
-	}
-
-	if *pRegion != "" {
-		showHelp = false
-		searchReagon(*pRegion)
 	}
 
 	if *pSearch != "" {
@@ -73,34 +66,44 @@ func refresh() {
 	}
 }
 
-func searchReagon(search string) {
-	reg, err := region.Search(search)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Printf("prefix: 0%s\n", reg.Prefix)
-	fmt.Printf("name:   %s\n", reg.Name)
-}
-
 func searchNumber(search string) {
-	if err := numbers.Load(); err != nil {
+	db, err := sql.Open("sqlite3", DB_FILE)
+	if err != nil {
 		panic(err)
 	}
+	defer db.Close()
 
-	number, err := numbers.Search(search)
+	number := Normalize(search)
+
+	for i := len(number); i > 0; i-- {
+		if single := getSingle(db, number[:i]); single != nil {
+			println(*single)
+		}
+	}
+
+}
+
+func Normalize(number string) string {
+	num := strings.Trim(number, " \t\r\n")
+	num = strings.TrimPrefix(num, "0043")
+	num = strings.TrimPrefix(num, "+43")
+	num = strings.TrimPrefix(num, "0")
+	return num
+}
+
+func getSingle(db *sql.DB, number string) *int {
+	rows, err := db.Query("select fk_range from singles where number = ?", number)
 	if err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
-
-	if number.PfxFrom == number.PfxTo {
-		fmt.Printf("number: 0%s%s\n", number.Prefix, number.PfxFrom)
-	} else {
-		fmt.Printf("number: 0%s%s - 0%s%s\n", number.Prefix, number.PfxFrom, number.Prefix, number.PfxTo)
-
+	defer rows.Close()
+	if rows.Next() {
+		var rangeId int
+		err = rows.Scan(&rangeId)
+		if err != nil {
+			panic(err)
+		}
+		return &rangeId
 	}
-	fmt.Printf("type: %s\n", number.NumberType.Name)
-	fmt.Printf("operator: %s - %s\n", number.Operator.Id, number.Operator.Name)
+	return nil
 }
