@@ -64,7 +64,7 @@ func refresh() {
 
 	db.Exec("PRAGMA synchronous = OFF")
 	db.Exec("PRAGMA journal_mode = OFF")
-	//db.Exec("PRAGMA locking_mode = EXCLUSIVE")
+	db.Exec("PRAGMA locking_mode = EXCLUSIVE")
 
 	if err := get.FromRtr(db); err != nil {
 		panic(err)
