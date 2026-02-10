@@ -15,7 +15,6 @@ import (
 const DB_FILE = "./gortr.sqlite3"
 
 func main() {
-	showHelp := true
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
 	pSearch := flag.String("search", "", "serach for a matching number")
 	pRegion := flag.String("region", "", "serach for a matching region")
@@ -24,34 +23,28 @@ func main() {
 	flag.Parse()
 
 	if *pRefresh {
-		showHelp = false
 		refresh()
 	}
 
-	if *pSearch != "" {
-		showHelp = false
-		db := openDb()
-		defer db.Close()
+	db := openDb()
+	defer db.Close()
 
+	if *pSearch != "" {
 		searchNumber(db, *pSearch)
+		return
 	}
 
 	if *pRegion != "" {
-		showHelp = false
-		db := openDb()
-		defer db.Close()
-
 		searchRegion(db, *pRegion)
+		return
 	}
 
 	if *pListRegions {
-		showHelp = false
-		db := openDb()
-		defer db.Close()
-
 		listRegions(db)
+		return
 	}
-	if showHelp {
+
+	if !*pRefresh {
 		fmt.Printf("no argument given\n")
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		flag.CommandLine.PrintDefaults()
@@ -60,6 +53,7 @@ func main() {
 
 func openDb() *sql.DB {
 	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+		fmt.Println("No database found, loading data from RTR")
 		refresh()
 	}
 
@@ -95,10 +89,12 @@ func searchNumber(db *sql.DB, search string) {
 	for i := len(number); i > 0; i-- {
 		if rangeId, single, err := getSingle(db, number[:i]); err == nil {
 			printNumber(db, search, rangeId, single)
+			return
 		} else if err != ErrorNotFound {
 			panic(err)
 		}
 	}
+	fmt.Printf("%s not found\n", search)
 }
 
 func Normalize(number string) string {
@@ -171,6 +167,7 @@ func searchRegion(db *sql.DB, search string) {
 			panic(err)
 		}
 	}
+	fmt.Printf("%s not found\n", search)
 }
 
 func listRegions(db *sql.DB) {

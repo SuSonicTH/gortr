@@ -85,7 +85,8 @@ func FromRtr(db *sql.DB) error {
 			return err
 		}
 	}
-	return nil
+
+	return insertCustomOperators(db)
 }
 
 func databaseInit(db *sql.DB) error {
@@ -102,6 +103,12 @@ func databaseInit(db *sql.DB) error {
 		numberTypeFileToId[nrType.value] = id
 		ntInsert = append(ntInsert, []string{id, nrType.name, nrType.value})
 	}
+
+	operatorMap["wird derzeit nicht vergeben"] = Operator{"10001", "<crrently not assigned>"}
+	operatorMap["------ nicht zugeteilt ------"] = Operator{"10002", "<not assigned>"}
+	operatorMap["Teilweise zugeteilt; Zuteilungsstatus siehe www.rtr.at/num/gz"] = Operator{"10003", "<partly assigned check www.rtr.at/num/gz>"}
+	operatorMap["--- NICHT im Zuteilungsbereich ---	"] = Operator{"10004", "<not in allocation area>"}
+
 	return dbload.BulkInsert(db, "number_type", ntInsert)
 }
 
@@ -146,6 +153,40 @@ func loadOperators(db *sql.DB, rows [][]string) error {
 	return dbload.BulkInsert(db, "operators", insert)
 }
 
+type Operator struct {
+	id   string
+	name string
+}
+
+var operatorId = 10_100
+var operatorMap map[string]Operator = make(map[string]Operator, 2_000)
+
+func getOperatorByName(name string) string {
+	if nop, OK := operatorMap[name]; OK {
+		return nop.id
+	}
+	id := strconv.Itoa(operatorId)
+	operatorId++
+
+	operatorMap[name] = Operator{id, name}
+	return id
+}
+
+func insertCustomOperators(db *sql.DB) error {
+	fmt.Printf("Inserting custom operators... ")
+	operators := make([][]string, 0, len(operatorMap))
+	for _, nop := range operatorMap {
+		operators = append(operators, []string{nop.id, nop.name, "", "", "", ""})
+	}
+
+	if err := dbload.BulkInsert(db, "operators", operators); err != nil {
+		return err
+	}
+
+	fmt.Printf("OK %d operators inserted", len(operatorMap))
+	return nil
+}
+
 func loadGeo(db *sql.DB, rows [][]string) error {
 	fmt.Printf("Reading geo... ")
 	geo := numberTypeNameToId["geo"]
@@ -154,7 +195,7 @@ func loadGeo(db *sql.DB, rows [][]string) error {
 	singles := make([][]string, 0, 800_000)
 
 	for _, row := range rows {
-		if err := addRange(geo, row[0], row[2], row[3], row[5], &ranges, &singles); err != nil {
+		if err := addRange(geo, row[0], row[2], row[3], row[5], row[4], &ranges, &singles); err != nil {
 			return err
 		}
 	}
@@ -182,7 +223,7 @@ func loadNonGeo(db *sql.DB, rows [][]string) error {
 
 	for _, row := range rows {
 		nrType := numberTypeFileToId[row[0]]
-		if err := addRange(nrType, row[1], row[2], row[3], row[5], &ranges, &singles); err != nil {
+		if err := addRange(nrType, row[1], row[2], row[3], row[5], row[4], &ranges, &singles); err != nil {
 			return err
 		}
 	}
@@ -201,12 +242,16 @@ func loadNonGeo(db *sql.DB, rows [][]string) error {
 	return nil
 }
 
-func addRange(numberType, prefix, from, to, nop string, ranges *[][]string, singles *[][]string) error {
+func addRange(numberType, prefix, from, to, nop string, nopName string, ranges *[][]string, singles *[][]string) error {
 	pfxFrom, pfxTo := getPrefix(from, to)
 	id := strconv.Itoa(len(*ranges) + lastRangesId)
 
 	if _, found := ignoredRanges[prefix+from]; found {
 		return nil
+	}
+
+	if nop == "" {
+		nop = getOperatorByName(nopName)
 	}
 
 	*ranges = append(*ranges, []string{id, numberType, prefix, from, to, nop})
