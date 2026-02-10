@@ -94,7 +94,7 @@ func searchNumber(db *sql.DB, search string) {
 			panic(err)
 		}
 	}
-	fmt.Printf("%s not found\n", search)
+	searchRegion(db, search)
 }
 
 func Normalize(number string) string {
@@ -125,43 +125,56 @@ func getSingle(db *sql.DB, search string) (rangeId string, single string, retErr
 const numberFormatStringRange = `searched      %s
 
 number        %s
+number type   %s (%s)
+
 prefix        %s
 range start   %s
 range end     %s
 
 operator      %s
               %s
-              %s %s %s
-              
+              %s %s %s             
 `
 
-func printNumber(db *sql.DB, search string, rangeId string, single string) (retErr error) {
+func printNumber(db *sql.DB, search string, rangeId string, single string) {
 	rows, err := db.Query(`
-		select r.prefix, r.start, r.end, 
+		select t.name, t.german_name,
+			   r.prefix, r.start, r.end, 
 		       o.name, o.street, o.country, o.zip, o.city
 		from ranges r,
-		     operators o
+		     operators o,
+			 number_type t
 		where r.id = ?
-		  and r.fk_operator = o.id`, rangeId)
+		  and r.fk_operator = o.id
+		  and r.fk_number_type = t.id`, rangeId)
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 
 	if rows.Next() {
-		var prefix, start, end, operatorName, street, country, zip, city string
-		retErr = rows.Scan(&prefix, &start, &end, &operatorName, &street, &zip, &city, &country)
-		fmt.Printf(numberFormatStringRange, search, single, prefix, start, end, operatorName, street, country, zip, city)
+		var numberType, germanType, prefix, start, end, operatorName, street, country, zip, city string
+		if err = rows.Scan(&numberType, &germanType, &prefix, &start, &end, &operatorName, &street, &zip, &city, &country); err != nil {
+			panic(err)
+		}
+		fmt.Printf(numberFormatStringRange, search, single, numberType, germanType, prefix, start, end, operatorName, street, country, zip, city)
 	}
-	return
 }
+
+const regionFormatStringRange = `searched      %s
+
+number        %s
+number type   geo (geographisch)
+
+region name   %s             
+`
 
 func searchRegion(db *sql.DB, search string) {
 	number := Normalize(search)
 
 	for i := len(number); i > 0; i-- {
 		if name, err := getRegion(db, number[:i]); err == nil {
-			fmt.Printf("%s,%s\n", number[:i], name)
+			fmt.Printf(regionFormatStringRange, search, number[:i], name)
 			return
 		} else if err != ErrorNotFound {
 			panic(err)

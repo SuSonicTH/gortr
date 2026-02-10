@@ -36,7 +36,7 @@ var numberTypes = []NumberType{
 	{"location independent", "standortunabhängige Rufnummern"},
 	{"converged service", "konvergente Dienste"},
 	{"freephone", "tariffreie Dienste"},
-	{"services with Ceeling", "Dienste mit geregelten Tarifobergrenzen"},
+	{"services with ceeling", "Dienste mit geregelten Tarifobergrenzen"},
 	{"event based service", "eventtarifierte Dienste"},
 	{"SMS service", "SMS Dienste mit geregelten Tarifobergrenzen"},
 	{"routing number", "Routingnummern"},
@@ -57,9 +57,9 @@ var sources = []Source{
 }
 
 var db_setup = []string{
-	"CREATE TABLE operators(id INTEGER PRIMARY KEY, name, country, zip, city,street)",
-	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, file_name)",
-	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER)",
+	"CREATE TABLE operators(id INTEGER PRIMARY KEY, name, country, zip, city, street)",
+	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, german_name)",
+	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, fk_number_type INTEGER, prefix, start, end, fk_operator INTEGER)",
 	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
 	"CREATE TABLE regions(prefix PRIMARY KEY,name)",
 	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
