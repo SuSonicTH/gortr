@@ -51,7 +51,7 @@ var sources = []Source{
 	{"operator", "https://data.rtr.at/api/v2/tables/tk-agg?mediaType=csv&unpaged=true", loadOperators},
 	{"geo", "https://data.rtr.at/api/v2/tables/tn-geo?de&mediaType=csv&unpaged=true", loadGeo},
 	{"nongeo", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true", loadNonGeo},
-	// {"region", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true"},
+	{"region", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true", loadRegions},
 	// {"short", "https://data.rtr.at/api/v2/tables/tn-kurz?mediaType=csv&unpaged=true"},
 	// {"param", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true"},
 }
@@ -61,7 +61,7 @@ var db_setup = []string{
 	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, file_name)",
 	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER)",
 	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
-	//"CREATE TABLE region(ortsnetzkennzahl,ortsnetzname)",
+	"CREATE TABLE regions(prefix PRIMARY KEY,name)",
 	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
 	//"CREATE TABLE param(parameter,wertvon,wertbis,betreiber,strasse,land,plz,ort,betreiberid)",
 }
@@ -252,5 +252,24 @@ func addSingles(pfxFrom, pfxTo, rangeId string, singles *[][]string) error {
 		}
 		*singles = append(*singles, []string{strconv.Itoa(i), rangeId})
 	}
+	return nil
+}
+
+func loadRegions(db *sql.DB, rows [][]string) error {
+	fmt.Printf("Reading regions... ")
+
+	regions := make([][]string, 0, 2_000)
+
+	for _, row := range rows {
+		regions = append(regions, row)
+	}
+	fmt.Printf("OK read %d regions\n", len(regions))
+
+	fmt.Printf("Inserting regions... ")
+	if err := dbload.BulkInsert(db, "regions", regions); err != nil {
+		return err
+	}
+
+	fmt.Println("OK")
 	return nil
 }

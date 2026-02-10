@@ -18,6 +18,8 @@ func main() {
 	showHelp := true
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
 	pSearch := flag.String("search", "", "serach for a matching number")
+	pRegion := flag.String("region", "", "serach for a matching region")
+	pListRegions := flag.Bool("listRegions", false, "list all regions with name")
 
 	flag.Parse()
 
@@ -34,6 +36,21 @@ func main() {
 		searchNumber(db, *pSearch)
 	}
 
+	if *pRegion != "" {
+		showHelp = false
+		db := openDb()
+		defer db.Close()
+
+		searchRegion(db, *pRegion)
+	}
+
+	if *pListRegions {
+		showHelp = false
+		db := openDb()
+		defer db.Close()
+
+		listRegions(db)
+	}
 	if showHelp {
 		fmt.Printf("no argument given\n")
 		fmt.Printf("Usage of %s:\n", os.Args[0])
@@ -92,7 +109,7 @@ func Normalize(number string) string {
 	return num
 }
 
-var ErrorNotFound = errors.New("Number not found in singles")
+var ErrorNotFound = errors.New("Number not found")
 
 func getSingle(db *sql.DB, search string) (rangeId string, single string, retErr error) {
 	rows, err := db.Query("select fk_range, number from singles where number = ?", search)
@@ -108,8 +125,6 @@ func getSingle(db *sql.DB, search string) (rangeId string, single string, retErr
 	}
 	return
 }
-
-//id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER, range_from, range_to
 
 const numberFormatStringRange = `searched      %s
 
@@ -141,6 +156,51 @@ func printNumber(db *sql.DB, search string, rangeId string, single string) (retE
 		var prefix, start, end, operatorName, street, country, zip, city string
 		retErr = rows.Scan(&prefix, &start, &end, &operatorName, &street, &zip, &city, &country)
 		fmt.Printf(numberFormatStringRange, search, single, prefix, start, end, operatorName, street, country, zip, city)
+	}
+	return
+}
+
+func searchRegion(db *sql.DB, search string) {
+	number := Normalize(search)
+
+	for i := len(number); i > 0; i-- {
+		if name, err := getRegion(db, number[:i]); err == nil {
+			fmt.Printf("%s,%s\n", number[:i], name)
+			return
+		} else if err != ErrorNotFound {
+			panic(err)
+		}
+	}
+}
+
+func listRegions(db *sql.DB) {
+	rows, err := db.Query("select prefix,name from regions order by 1")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var prefix, name string
+		if err := rows.Scan(&prefix, &name); err != nil {
+			panic(err)
+		}
+		fmt.Printf("%s,%s\n", prefix, name)
+	}
+}
+
+func getRegion(db *sql.DB, search string) (name string, retErr error) {
+	rows, err := db.Query("select name from regions where prefix = ?", search)
+	if err != nil {
+		retErr = err
+		return
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		retErr = rows.Scan(&name)
+	} else {
+		retErr = ErrorNotFound
 	}
 	return
 }
