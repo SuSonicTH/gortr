@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -75,11 +76,12 @@ func searchNumber(db *sql.DB, search string) {
 	number := Normalize(search)
 
 	for i := len(number); i > 0; i-- {
-		if single := getSingle(db, number[:i]); single != nil {
-			println(*single)
+		if rangeId, single, err := getSingle(db, number[:i]); err == nil {
+			printNumber(db, search, rangeId, single)
+		} else if err != ErrorNotFound {
+			panic(err)
 		}
 	}
-
 }
 
 func Normalize(number string) string {
@@ -90,20 +92,55 @@ func Normalize(number string) string {
 	return num
 }
 
-func getSingle(db *sql.DB, number string) *int {
-	rows, err := db.Query("select fk_range from singles where number = ?", number)
+var ErrorNotFound = errors.New("Number not found in singles")
+
+func getSingle(db *sql.DB, search string) (rangeId string, single string, retErr error) {
+	rows, err := db.Query("select fk_range, number from singles where number = ?", search)
 	if err != nil {
 		panic(err)
 	}
 	defer rows.Close()
 
 	if rows.Next() {
-		var rangeId int
-		err = rows.Scan(&rangeId)
-		if err != nil {
-			panic(err)
-		}
-		return &rangeId
+		retErr = rows.Scan(&rangeId, &single)
+	} else {
+		retErr = ErrorNotFound
 	}
-	return nil
+	return
+}
+
+//id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER, range_from, range_to
+
+const numberFormatStringRange = `searched      %s
+
+number        %s
+prefix        %s
+range start   %s
+range end     %s
+
+operator      %s
+              %s
+              %s %s %s
+              
+`
+
+func printNumber(db *sql.DB, search string, rangeId string, single string) (retErr error) {
+	rows, err := db.Query(`
+		select r.prefix, r.start, r.end, 
+		       o.name, o.street, o.country, o.zip, o.city
+		from ranges r,
+		     operators o
+		where r.id = ?
+		  and r.fk_operator = o.id`, rangeId)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var prefix, start, end, operatorName, street, country, zip, city string
+		retErr = rows.Scan(&prefix, &start, &end, &operatorName, &street, &zip, &city, &country)
+		fmt.Printf(numberFormatStringRange, search, single, prefix, start, end, operatorName, street, country, zip, city)
+	}
+	return
 }

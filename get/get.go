@@ -59,7 +59,7 @@ var sources = []Source{
 var db_setup = []string{
 	"CREATE TABLE operators(id INTEGER PRIMARY KEY, name, country, zip, city,street)",
 	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, file_name)",
-	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER, range_from, range_to)",
+	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, type INTEGER, prefix, start, end, fk_operator INTEGER)",
 	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
 	//"CREATE TABLE region(ortsnetzkennzahl,ortsnetzname)",
 	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
@@ -209,7 +209,7 @@ func addRange(numberType, prefix, from, to, nop string, ranges *[][]string, sing
 		return nil
 	}
 
-	*ranges = append(*ranges, []string{id, numberType, prefix, from, to, nop, pfxFrom, pfxTo})
+	*ranges = append(*ranges, []string{id, numberType, prefix, from, to, nop})
 	if err := addSingles(prefix+pfxFrom, prefix+pfxTo, id, singles); err != nil {
 		if err == ErrDuplicateSingle {
 			fmt.Fprintf(os.Stderr, "duplicated singles found for prefix %s from %s to %s\n", prefix, from, to)
