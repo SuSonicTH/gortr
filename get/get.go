@@ -51,7 +51,7 @@ var sources = []Source{
 	{"operator", "https://data.rtr.at/api/v2/tables/tk-agg?mediaType=csv&unpaged=true", loadOperators},
 	{"geo", "https://data.rtr.at/api/v2/tables/tn-geo?de&mediaType=csv&unpaged=true", loadGeo},
 	{"nongeo", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true", loadNonGeo},
-	{"region", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true", loadRegions},
+	{"local area", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true", loadLocalAreas},
 	// {"short", "https://data.rtr.at/api/v2/tables/tn-kurz?mediaType=csv&unpaged=true"},
 	// {"param", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true"},
 }
@@ -61,7 +61,7 @@ var db_setup = []string{
 	"CREATE TABLE number_type(id INTEGER PRIMARY KEY, name, german_name)",
 	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, fk_number_type INTEGER, prefix, start, end, fk_operator INTEGER)",
 	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
-	"CREATE TABLE regions(prefix PRIMARY KEY,name)",
+	"CREATE TABLE local_areas(prefix PRIMARY KEY,name)",
 	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
 	//"CREATE TABLE param(parameter,wertvon,wertbis,betreiber,strasse,land,plz,ort,betreiberid)",
 }
@@ -300,18 +300,18 @@ func addSingles(pfxFrom, pfxTo, rangeId string, singles *[][]string) error {
 	return nil
 }
 
-func loadRegions(db *sql.DB, rows [][]string) error {
-	fmt.Printf("Reading regions... ")
+func loadLocalAreas(db *sql.DB, rows [][]string) error {
+	fmt.Printf("Reading local areas... ")
 
-	regions := make([][]string, 0, 2_000)
+	localAreas := make([][]string, 0, 2_000)
 
 	for _, row := range rows {
-		regions = append(regions, row)
+		localAreas = append(localAreas, row)
 	}
-	fmt.Printf("OK read %d regions\n", len(regions))
+	fmt.Printf("OK read %d local areas\n", len(localAreas))
 
-	fmt.Printf("Inserting regions... ")
-	if err := dbload.BulkInsert(db, "regions", regions); err != nil {
+	fmt.Printf("Inserting local areas... ")
+	if err := dbload.BulkInsert(db, "local_areas", localAreas); err != nil {
 		return err
 	}
 

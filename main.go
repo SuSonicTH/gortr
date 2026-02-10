@@ -17,8 +17,8 @@ const DB_FILE = "./gortr.sqlite3"
 func main() {
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
 	pSearch := flag.String("search", "", "serach for a matching number")
-	pRegion := flag.String("region", "", "serach for a matching region")
-	pListRegions := flag.Bool("listRegions", false, "list all regions with name")
+	pLocalArea := flag.String("localArea", "", "serach for a matching local area")
+	pListLocalAreas := flag.Bool("listLocalAreas", false, "list all local areas with name")
 
 	flag.Parse()
 
@@ -34,13 +34,13 @@ func main() {
 		return
 	}
 
-	if *pRegion != "" {
-		searchRegion(db, *pRegion)
+	if *pLocalArea != "" {
+		searchLocalArea(db, *pLocalArea)
 		return
 	}
 
-	if *pListRegions {
-		listRegions(db)
+	if *pListLocalAreas {
+		listLocalAreas(db)
 		return
 	}
 
@@ -94,7 +94,7 @@ func searchNumber(db *sql.DB, search string) {
 			panic(err)
 		}
 	}
-	searchRegion(db, search)
+	searchLocalArea(db, search)
 }
 
 func Normalize(number string) string {
@@ -161,20 +161,20 @@ func printNumber(db *sql.DB, search string, rangeId string, single string) {
 	}
 }
 
-const regionFormatStringRange = `searched      %s
+const localAreaFormatStringRange = `searched      %s
 
 number        %s
 number type   geo (geographisch)
 
-region name   %s             
+local area    %s             
 `
 
-func searchRegion(db *sql.DB, search string) {
+func searchLocalArea(db *sql.DB, search string) {
 	number := Normalize(search)
 
 	for i := len(number); i > 0; i-- {
-		if name, err := getRegion(db, number[:i]); err == nil {
-			fmt.Printf(regionFormatStringRange, search, number[:i], name)
+		if name, err := getLocalArea(db, number[:i]); err == nil {
+			fmt.Printf(localAreaFormatStringRange, search, number[:i], name)
 			return
 		} else if err != ErrorNotFound {
 			panic(err)
@@ -183,8 +183,8 @@ func searchRegion(db *sql.DB, search string) {
 	fmt.Printf("%s not found\n", search)
 }
 
-func listRegions(db *sql.DB) {
-	rows, err := db.Query("select prefix,name from regions order by 1")
+func listLocalAreas(db *sql.DB) {
+	rows, err := db.Query("select prefix,name from local_areas order by 1")
 	if err != nil {
 		panic(err)
 	}
@@ -199,8 +199,8 @@ func listRegions(db *sql.DB) {
 	}
 }
 
-func getRegion(db *sql.DB, search string) (name string, retErr error) {
-	rows, err := db.Query("select name from regions where prefix = ?", search)
+func getLocalArea(db *sql.DB, search string) (name string, retErr error) {
+	rows, err := db.Query("select name from local_areas where prefix = ?", search)
 	if err != nil {
 		retErr = err
 		return
