@@ -4,3 +4,4 @@ gortr.sqlite3
 *.csv
 profile
 
+bin/
