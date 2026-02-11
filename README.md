@@ -3,7 +3,7 @@ a simple tool to download numbering data from the austrian [RTR](https://www.rtr
 
 This is mainly a lerning excercise to get into [go](https://go.dev/)
 
-## installation
+## Installation
 
 If you have go installed and a working CGO environmant (see below) you can use following command to install the tool
 ```
