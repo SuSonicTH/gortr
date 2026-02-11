@@ -19,6 +19,8 @@ func main() {
 	pSearch := flag.String("search", "", "serach for a matching number")
 	pLocalArea := flag.String("localArea", "", "serach for a matching local area")
 	pListLocalAreas := flag.Bool("listLocalAreas", false, "list all local areas with name")
+	pListParameter := flag.String("listParameter", "", "list given parameter type use ALL for every parameter")
+	pListParameterTypes := flag.Bool("listParameterTypes", false, "list all parameter types to use in -listParameter")
 
 	flag.Parse()
 
@@ -41,6 +43,16 @@ func main() {
 
 	if *pListLocalAreas {
 		listLocalAreas(db)
+		return
+	}
+
+	if *pListParameter != "" {
+		listParameter(db, *pListParameter)
+		return
+	}
+
+	if *pListParameterTypes {
+		listParameterTypes(db)
 		return
 	}
 
@@ -133,20 +145,20 @@ range end     %s
 
 operator      %s
               %s
-              %s %s %s             
+              %s %s %s
 `
 
 func printNumber(db *sql.DB, search string, rangeId string, single string) {
 	rows, err := db.Query(`
-		select t.name, t.german_name,
-			   r.prefix, r.start, r.end, 
-		       o.name, o.street, o.country, o.zip, o.city
-		from ranges r,
-		     operators o,
-			 number_type t
-		where r.id = ?
-		  and r.fk_operator = o.id
-		  and r.fk_number_type = t.id`, rangeId)
+        select t.name, t.german_name,
+               r.prefix, r.start, r.end, 
+               o.name, o.street, o.country, o.zip, o.city
+        from ranges r,
+             operators o,
+             number_type t
+        where r.id = ?
+          and r.fk_operator = o.id
+          and r.fk_number_type = t.id`, rangeId)
 	if err != nil {
 		panic(err)
 	}
@@ -161,12 +173,12 @@ func printNumber(db *sql.DB, search string, rangeId string, single string) {
 	}
 }
 
-const localAreaFormatStringRange = `searched      %s
+const localAreaFormatString = `searched      %s
 
 number        %s
 number type   geo (geographisch)
 
-local area    %s             
+local area    %s
 `
 
 func searchLocalArea(db *sql.DB, search string) {
@@ -174,7 +186,7 @@ func searchLocalArea(db *sql.DB, search string) {
 
 	for i := len(number); i > 0; i-- {
 		if name, err := getLocalArea(db, number[:i]); err == nil {
-			fmt.Printf(localAreaFormatStringRange, search, number[:i], name)
+			fmt.Printf(localAreaFormatString, search, number[:i], name)
 			return
 		} else if err != ErrorNotFound {
 			panic(err)
@@ -213,4 +225,57 @@ func getLocalArea(db *sql.DB, search string) (name string, retErr error) {
 		retErr = ErrorNotFound
 	}
 	return
+}
+
+func listParameterTypes(db *sql.DB) {
+	rows, err := db.Query("select distinct type from parameters order by 1")
+
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ptype string
+		if err := rows.Scan(&ptype); err != nil {
+			panic(err)
+		}
+		fmt.Println(ptype)
+	}
+}
+
+func listParameter(db *sql.DB, parameter string) {
+	var typeContraint = ""
+	if parameter != "ALL" {
+		if parameter == "MCC" {
+			parameter = "MNC"
+		}
+		typeContraint = " and p.type = '" + parameter + "'"
+	}
+	rows, err := db.Query(`
+		select 
+			p.type, p.value_start, p.value_end,
+			o.name, o.street, o.zip, o.city, o.country
+		from 
+			parameters p,
+			operators o
+		where p.fk_operator = o.id` + typeContraint)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ptype, start, end, operatorName, street, zip, city, country string
+		if err := rows.Scan(&ptype, &start, &end, &operatorName, &street, &zip, &city, &country); err != nil {
+			panic(err)
+		}
+		if parameter == "ALL" {
+			fmt.Printf("%s,%s,%s,%s; %s; %s %s %s\n", ptype, start, end, operatorName, street, zip, city, country)
+		} else if end == "" {
+			fmt.Printf("%s,%s; %s; %s %s %s\n", start, operatorName, street, zip, city, country)
+		} else {
+			fmt.Printf("%s,%s,%s; %s; %s %s %s\n", start, end, operatorName, street, zip, city, country)
+		}
+	}
 }

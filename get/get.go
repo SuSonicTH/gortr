@@ -44,6 +44,7 @@ var numberTypes = []NumberType{
 	{"event based value added service", "eventtarifierte Mehrwertdienste"},
 	{"dialer-program", "Dialer-Programme"},
 }
+
 var numberTypeNameToId map[string]string = make(map[string]string, len(numberTypes))
 var numberTypeFileToId map[string]string = make(map[string]string, len(numberTypes))
 
@@ -52,8 +53,7 @@ var sources = []Source{
 	{"geo", "https://data.rtr.at/api/v2/tables/tn-geo?de&mediaType=csv&unpaged=true", loadGeo},
 	{"nongeo", "https://data.rtr.at/api/v2/tables/tn-dienste?mediaType=csv&unpaged=true", loadNonGeo},
 	{"local area", "https://data.rtr.at/api/v2/tables/tn-ortsnetze?mediaType=csv&unpaged=true", loadLocalAreas},
-	// {"short", "https://data.rtr.at/api/v2/tables/tn-kurz?mediaType=csv&unpaged=true"},
-	// {"param", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true"},
+	{"parameters", "https://data.rtr.at/api/v2/tables/tn-skp?mediaType=csv&unpaged=true", loadParameters},
 }
 
 var db_setup = []string{
@@ -62,8 +62,7 @@ var db_setup = []string{
 	"CREATE TABLE ranges(id INTEGER PRIMARY KEY, fk_number_type INTEGER, prefix, start, end, fk_operator INTEGER)",
 	"CREATE TABLE singles(number PRIMARY KEY, fk_range INTEGER)",
 	"CREATE TABLE local_areas(prefix PRIMARY KEY,name)",
-	//"CREATE TABLE short(rufnummernbereich,gebiet,rufnummer,betreiber,betreiberid)",
-	//"CREATE TABLE param(parameter,wertvon,wertbis,betreiber,strasse,land,plz,ort,betreiberid)",
+	"CREATE TABLE parameters(type, value_start, value_end, fk_operator INTEGER, PRIMARY KEY (type, value_start, value_end))",
 }
 
 var operators map[string]string = make(map[string]string)
@@ -73,7 +72,9 @@ var ignoredRanges map[string]bool = make(map[string]bool)
 var lastRangesId = 1
 
 func FromRtr(db *sql.DB) error {
-	databaseInit(db)
+	if err := databaseInit(db); err != nil {
+		return err
+	}
 	initIgnoredRanges()
 
 	for _, source := range sources {
@@ -312,6 +313,27 @@ func loadLocalAreas(db *sql.DB, rows [][]string) error {
 
 	fmt.Printf("Inserting local areas... ")
 	if err := dbload.BulkInsert(db, "local_areas", localAreas); err != nil {
+		return err
+	}
+
+	fmt.Println("OK")
+	return nil
+}
+
+func loadParameters(db *sql.DB, rows [][]string) error {
+	fmt.Printf("Reading parameters... ")
+
+	parameters := make([][]string, 0, 2_000)
+
+	for _, row := range rows {
+		if row[0] != "T-MNC" {
+			parameters = append(parameters, []string{row[0], row[1], row[2], row[8]})
+		}
+	}
+	fmt.Printf("OK read %d parameters\n", len(parameters))
+
+	fmt.Printf("Inserting parameters... ")
+	if err := dbload.BulkInsert(db, "parameters", parameters); err != nil {
 		return err
 	}
 
