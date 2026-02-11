@@ -1,72 +1,290 @@
 package main
 
 import (
+	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
-	"github.com/SuSonicTH/gortr/data/numbers"
-	"github.com/SuSonicTH/gortr/data/region"
+	_ "embed"
+
 	"github.com/SuSonicTH/gortr/get"
+	_ "github.com/mattn/go-sqlite3"
 )
 
+const DB_FILE = "./gortr.sqlite3"
+
 func main() {
-	showHelp := true
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
-	pRegion := flag.String("region", "", "match given number to a region")
 	pSearch := flag.String("search", "", "serach for a matching number")
+	pLocalArea := flag.String("localArea", "", "serach for a matching local area")
+	pListLocalAreas := flag.Bool("listLocalAreas", false, "list all local areas with name")
+	pListParameter := flag.String("listParameter", "", "list given parameter type use ALL for every parameter")
+	pListParameterTypes := flag.Bool("listParameterTypes", false, "list all parameter types to use in -listParameter")
 
 	flag.Parse()
 
 	if *pRefresh {
-		showHelp = false
-		get.Numbers()
+		refresh()
 	}
-	if *pRegion != "" {
-		showHelp = false
-		searchReagon(*pRegion)
-	}
+
+	db := openDb()
+	defer db.Close()
 
 	if *pSearch != "" {
-		showHelp = false
-		searchNumber(*pSearch)
+		searchNumber(db, *pSearch)
+		return
 	}
 
-	if showHelp {
+	if *pLocalArea != "" {
+		searchLocalArea(db, *pLocalArea)
+		return
+	}
+
+	if *pListLocalAreas {
+		listLocalAreas(db)
+		return
+	}
+
+	if *pListParameter != "" {
+		listParameter(db, *pListParameter)
+		return
+	}
+
+	if *pListParameterTypes {
+		listParameterTypes(db)
+		return
+	}
+
+	if !*pRefresh {
 		fmt.Printf("no argument given\n")
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		flag.CommandLine.PrintDefaults()
 	}
 }
 
-func searchReagon(search string) {
-	reg, err := region.Search(search)
-	if err != nil {
-		fmt.Println(err)
-		return
+func openDb() *sql.DB {
+	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+		fmt.Println("No database found, loading data from RTR")
+		refresh()
 	}
 
-	fmt.Printf("prefix: 0%s\n", reg.Prefix)
-	fmt.Printf("name:   %s\n", reg.Name)
-}
-
-func searchNumber(search string) {
-	if err := numbers.Load(); err != nil {
+	db, err := sql.Open("sqlite3", DB_FILE)
+	if err != nil {
 		panic(err)
 	}
 
-	number, err := numbers.Search(search)
+	return db
+}
+
+//go:embed ignoredRanges
+var ignoredRanges []byte
+
+func refresh() {
+	os.Remove(DB_FILE)
+
+	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+		os.WriteFile("ignoredRanges", ignoredRanges, 0644)
+	}
+
+	db, err := sql.Open("sqlite3", DB_FILE)
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
+	}
+	defer db.Close()
+
+	db.Exec("PRAGMA synchronous = OFF")
+	db.Exec("PRAGMA journal_mode = OFF")
+	db.Exec("PRAGMA locking_mode = EXCLUSIVE")
+
+	if err := get.FromRtr(db); err != nil {
+		panic(err)
+	}
+}
+
+func searchNumber(db *sql.DB, search string) {
+	number := Normalize(search)
+
+	for i := len(number); i > 0; i-- {
+		if rangeId, single, err := getSingle(db, number[:i]); err == nil {
+			printNumber(db, search, rangeId, single)
+			return
+		} else if err != ErrorNotFound {
+			panic(err)
+		}
+	}
+	searchLocalArea(db, search)
+}
+
+func Normalize(number string) string {
+	num := strings.Trim(number, " \t\r\n")
+	num = strings.TrimPrefix(num, "0043")
+	num = strings.TrimPrefix(num, "+43")
+	num = strings.TrimPrefix(num, "0")
+	return num
+}
+
+var ErrorNotFound = errors.New("Number not found")
+
+func getSingle(db *sql.DB, search string) (rangeId string, single string, retErr error) {
+	rows, err := db.Query("select fk_range, number from singles where number = ?", search)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		retErr = rows.Scan(&rangeId, &single)
+	} else {
+		retErr = ErrorNotFound
+	}
+	return
+}
+
+const numberFormatStringRange = `searched      %s
+
+number        %s
+number type   %s (%s)
+
+prefix        %s
+range start   %s
+range end     %s
+
+operator      %s
+              %s
+              %s %s %s
+`
+
+func printNumber(db *sql.DB, search string, rangeId string, single string) {
+	rows, err := db.Query(`
+        select t.name, t.german_name,
+               r.prefix, r.start, r.end, 
+               o.name, o.street, o.country, o.zip, o.city
+        from ranges r,
+             operators o,
+             number_type t
+        where r.id = ?
+          and r.fk_operator = o.id
+          and r.fk_number_type = t.id`, rangeId)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	if rows.Next() {
+		var numberType, germanType, prefix, start, end, operatorName, street, country, zip, city string
+		if err = rows.Scan(&numberType, &germanType, &prefix, &start, &end, &operatorName, &street, &zip, &city, &country); err != nil {
+			panic(err)
+		}
+		fmt.Printf(numberFormatStringRange, search, single, numberType, germanType, prefix, start, end, operatorName, street, country, zip, city)
+	}
+}
+
+const localAreaFormatString = `searched      %s
+
+number        %s
+number type   geo (geographisch)
+
+local area    %s
+`
+
+func searchLocalArea(db *sql.DB, search string) {
+	number := Normalize(search)
+
+	for i := len(number); i > 0; i-- {
+		if name, err := getLocalArea(db, number[:i]); err == nil {
+			fmt.Printf(localAreaFormatString, search, number[:i], name)
+			return
+		} else if err != ErrorNotFound {
+			panic(err)
+		}
+	}
+	fmt.Printf("%s not found\n", search)
+}
+
+func listLocalAreas(db *sql.DB) {
+	rows, err := db.Query("select prefix,name from local_areas order by 1")
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var prefix, name string
+		if err := rows.Scan(&prefix, &name); err != nil {
+			panic(err)
+		}
+		fmt.Printf("%s,%s\n", prefix, name)
+	}
+}
+
+func getLocalArea(db *sql.DB, search string) (name string, retErr error) {
+	rows, err := db.Query("select name from local_areas where prefix = ?", search)
+	if err != nil {
+		retErr = err
 		return
 	}
+	defer rows.Close()
 
-	if number.PfxFrom == number.PfxTo {
-		fmt.Printf("number: 0%s%s\n", number.Prefix, number.PfxFrom)
+	if rows.Next() {
+		retErr = rows.Scan(&name)
 	} else {
-		fmt.Printf("number: 0%s%s - 0%s%s\n", number.Prefix, number.PfxFrom, number.Prefix, number.PfxTo)
-
+		retErr = ErrorNotFound
 	}
-	fmt.Printf("type: %s\n", number.NumberType.Name)
-	fmt.Printf("operator: %s - %s\n", number.Operator.Id, number.Operator.Name)
+	return
+}
+
+func listParameterTypes(db *sql.DB) {
+	rows, err := db.Query("select distinct type from parameters order by 1")
+
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ptype string
+		if err := rows.Scan(&ptype); err != nil {
+			panic(err)
+		}
+		fmt.Println(ptype)
+	}
+}
+
+func listParameter(db *sql.DB, parameter string) {
+	var typeContraint = ""
+	if parameter != "ALL" {
+		if parameter == "MCC" {
+			parameter = "MNC"
+		}
+		typeContraint = " and p.type = '" + parameter + "'"
+	}
+	rows, err := db.Query(`
+		select 
+			p.type, p.value_start, p.value_end,
+			o.name, o.street, o.zip, o.city, o.country
+		from 
+			parameters p,
+			operators o
+		where p.fk_operator = o.id` + typeContraint)
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var ptype, start, end, operatorName, street, zip, city, country string
+		if err := rows.Scan(&ptype, &start, &end, &operatorName, &street, &zip, &city, &country); err != nil {
+			panic(err)
+		}
+		if parameter == "ALL" {
+			fmt.Printf("%s,%s,%s,%s; %s; %s %s %s\n", ptype, start, end, operatorName, street, zip, city, country)
+		} else if end == "" {
+			fmt.Printf("%s,%s; %s; %s %s %s\n", start, operatorName, street, zip, city, country)
+		} else {
+			fmt.Printf("%s,%s,%s; %s; %s %s %s\n", start, end, operatorName, street, zip, city, country)
+		}
+	}
 }
