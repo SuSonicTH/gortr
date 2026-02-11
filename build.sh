@@ -6,6 +6,7 @@ go install github.com/SuSonicTH/goz@latest
 
 echo clearing ./bin
 rm -rf bin &> /dev/null
+echo 
 
 case "$(uname -s)" in
     Linux*)     HOST_OS='linux';;
