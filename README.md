@@ -5,6 +5,10 @@ This is mainly a lerning excercise to get into [go](https://go.dev/)
 
 ## Installation
 
+### from the release page
+just download the binary for your platform from the [releaeses](https://github.com/SuSonicTH/gortr/releases) and execute it, put it on your path for convinence.
+
+### from source
 If you have go installed and a working CGO environmant (see below) you can use following command to install the tool
 ```
 go install github.com/SuSonicTH/gortr
@@ -34,5 +38,8 @@ Usage of gortr:
   -refresh
         get data from rtr.at
   -search string
-        serach for a matching number
+        serach for a matching number (in national format with/without leading zero or international format with +43 or 0043)
 ```
+
+On the first run, or whenever you execute it with the argument `--refresh`, the tool gets all the numbering data from [RTR](https://www.rtr.at/) and saves the data in you home directory under `.gortr/gortr.sqlite3`
+The downloaded data is just a few MB but the data in the sqlite database stored locally is *almost 700MB* because of the huge number of single numbers in all the ranges.
