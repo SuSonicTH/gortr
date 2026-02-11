@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	_ "embed"
+
 	"github.com/SuSonicTH/gortr/get"
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -77,8 +79,15 @@ func openDb() *sql.DB {
 	return db
 }
 
+//go:embed ignoredRanges
+var ignoredRanges []byte
+
 func refresh() {
 	os.Remove(DB_FILE)
+
+	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+		os.WriteFile("ignoredRanges", ignoredRanges, 0644)
+	}
 
 	db, err := sql.Open("sqlite3", DB_FILE)
 	if err != nil {
