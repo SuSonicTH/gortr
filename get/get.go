@@ -71,11 +71,11 @@ var ignoredRanges map[string]bool = make(map[string]bool)
 
 var lastRangesId = 1
 
-func FromRtr(db *sql.DB) error {
+func FromRtr(db *sql.DB, ignoredFilePath string) error {
 	if err := databaseInit(db); err != nil {
 		return err
 	}
-	initIgnoredRanges()
+	initIgnoredRanges(ignoredFilePath)
 
 	for _, source := range sources {
 		rows, err := downloadFile(source.url, source.name)
@@ -113,8 +113,8 @@ func databaseInit(db *sql.DB) error {
 	return dbload.BulkInsert(db, "number_type", ntInsert)
 }
 
-func initIgnoredRanges() {
-	if data, err := os.ReadFile("ignoredRanges"); err == nil {
+func initIgnoredRanges(ignoredFilePath string) {
+	if data, err := os.ReadFile(ignoredFilePath); err == nil {
 		for _, number := range strings.Split(string(data), "\n") {
 			ignoredRanges[number] = true
 		}

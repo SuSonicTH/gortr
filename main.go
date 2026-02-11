@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path"
 	"strings"
 
 	_ "embed"
@@ -14,17 +15,27 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-const DB_FILE = "./gortr.sqlite3"
+const dbFileName = "gortr.sqlite3"
+
+var dbFilePath string
+
+const ignoredRangesName = "ignoredRanges"
+
+var ignoredFilePath string
 
 func main() {
 	pRefresh := flag.Bool("refresh", false, "get data from rtr.at")
-	pSearch := flag.String("search", "", "serach for a matching number")
+	pSearch := flag.String("search", "", "serach for a matching number (in national format with/without leading zero or international format with +43 or 0043)")
 	pLocalArea := flag.String("localArea", "", "serach for a matching local area")
 	pListLocalAreas := flag.Bool("listLocalAreas", false, "list all local areas with name")
 	pListParameter := flag.String("listParameter", "", "list given parameter type use ALL for every parameter")
 	pListParameterTypes := flag.Bool("listParameterTypes", false, "list all parameter types to use in -listParameter")
 
 	flag.Parse()
+
+	if err := setupPaths(); err != nil {
+		panic(err)
+	}
 
 	if *pRefresh {
 		refresh()
@@ -65,13 +76,33 @@ func main() {
 	}
 }
 
+func setupPaths() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+
+	homePath := path.Join(home, ".gortr")
+
+	if _, err := os.Stat(homePath); os.IsNotExist(err) {
+		if err := os.MkdirAll(homePath, 0755); err != nil {
+			return err
+		}
+	}
+
+	dbFilePath = path.Join(homePath, dbFileName)
+	ignoredFilePath = path.Join(homePath, ignoredRangesName)
+
+	return nil
+}
+
 func openDb() *sql.DB {
-	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
+	if _, err := os.Stat(dbFilePath); os.IsNotExist(err) {
 		fmt.Println("No database found, loading data from RTR")
 		refresh()
 	}
 
-	db, err := sql.Open("sqlite3", DB_FILE)
+	db, err := sql.Open("sqlite3", dbFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -83,13 +114,13 @@ func openDb() *sql.DB {
 var ignoredRanges []byte
 
 func refresh() {
-	os.Remove(DB_FILE)
+	os.Remove(dbFilePath)
 
-	if _, err := os.Stat(DB_FILE); os.IsNotExist(err) {
-		os.WriteFile("ignoredRanges", ignoredRanges, 0644)
+	if _, err := os.Stat(ignoredFilePath); os.IsNotExist(err) {
+		os.WriteFile(ignoredFilePath, ignoredRanges, 0644)
 	}
 
-	db, err := sql.Open("sqlite3", DB_FILE)
+	db, err := sql.Open("sqlite3", dbFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -99,7 +130,7 @@ func refresh() {
 	db.Exec("PRAGMA journal_mode = OFF")
 	db.Exec("PRAGMA locking_mode = EXCLUSIVE")
 
-	if err := get.FromRtr(db); err != nil {
+	if err := get.FromRtr(db, ignoredFilePath); err != nil {
 		panic(err)
 	}
 }
